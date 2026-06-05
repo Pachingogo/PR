@@ -1,290 +1,189 @@
-from collections import defaultdict
-from pathlib import Path
-import sqlite3
-
-import streamlit as st
-import altair as alt
+import numpy as np
+from scipy import stats
 import pandas as pd
+from alpaca.data.historical import StockHistoricalDataClient
+from alpaca.data.timeframe import TimeFrame
+from alpaca.data.requests import StockBarsRequest, StockSnapshotRequest
+from datetime import datetime, timedelta
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mtick
+import streamlit as st
+from streamlit_autorefresh import st_autorefresh
 
-
-# Set the title and favicon that appear in the Browser's tab bar.
+# --- STREAMLIT PAGE SETUP ---
 st.set_page_config(
-    page_title="Inventory tracker",
-    page_icon=":shopping_bags:",  # This is an emoji shortcode. Could be a URL too.
+    page_title="Alpaca Percentile Analysis", 
+    page_icon="📊", 
+    layout="wide"
 )
 
+class Percentile_Analysis:
+    def __init__(
+        self,
+        df_source: str = None, 
+        symbol: str = None,
+        start_date: str = None,
+        end_date: str = None,
+        api_key: str = None,
+        api_secret: str = None):
+        
+        self.df_source = df_source
+        self.symbol = symbol
+        self.start_date = (
+            datetime.strptime(start_date, "%Y-%m-%d")
+            if start_date
+            else (datetime.today() - timedelta(days=730)).strftime("%Y-%m-%d"))
+        
+        self.end_date = (datetime.strptime(end_date, "%Y-%m-%d") if end_date else datetime.today())
+        self.time_frame = TimeFrame.Day
+        self.api_key = api_key
+        self.api_secret = api_secret
+        
+        self.data = self.load_dataset() if self.df_source is not None else self.fetch_data()
+        self.analysis_result = pd.DataFrame()
+        self.snapshot = self.snap()
 
-# -----------------------------------------------------------------------------
-# Declare some useful functions.
+    def load_dataset(self):
+        if self.df_source is not None:
+            df = pd.read_csv(self.df_source, index_col=0)
+            df.index = pd.to_datetime(df.index)
+            return df
+
+    def fetch_data(self) -> pd.DataFrame:
+        try:
+            client = StockHistoricalDataClient(self.api_key, self.api_secret)
+            request = StockBarsRequest(
+                symbol_or_symbols=self.symbol,
+                timeframe=TimeFrame.Day,
+                start=self.start_date,
+                end=self.end_date,
+                adjustment="all"
+            )
+            bars = client.get_stock_bars(request)
+            df = (
+                bars.df.droplevel(0)
+                if isinstance(bars.df.index, pd.MultiIndex)
+                else bars.df
+            )
+            df = df.rename(columns={"close": "price"})
+            df["ret"] = df["price"].pct_change().fillna(0)
+            df.index = pd.to_datetime(df.index)
+            return df
+        except Exception as e:
+            st.error(f"Alpaca API error during historical fetch: {e}")
+            raise e
+
+    def snap(self):
+        client = StockHistoricalDataClient(self.api_key, self.api_secret)
+        request = StockSnapshotRequest(symbol_or_symbols=self.symbol)
+        snapshots = client.get_stock_snapshot(request)
+        return snapshots[self.symbol]
+
+    def PR(self):
+        df = self.data.copy()
+        df["OC"] = df["open"] / df["price"].shift(1) - 1
+        df["HC"] = df["high"] / df["price"].shift(1) - 1
+        df["LC"] = df["low"] / df["price"].shift(1) - 1
+        df["CC"] = df["price"] / df["price"].shift(1) - 1
+        data_sets_per = []
+        
+        for col in ["CC", "OC", "HC", "LC" ]:
+            data = df[col].dropna().to_numpy()
+            data_sets_per.append(data)
+
+        daily = self.snapshot.daily_bar
+        pre_daily = self.snapshot.previous_daily_bar
+        
+        input_values = [daily.close, daily.open, daily.high, daily.low]         
+        data_sets = [(x + 1) * pre_daily.close for x in data_sets_per] 
+        labels = ["Current", "Open", "High", "Low"]
+        
+        current_metrics = []
+        fig, axes = plt.subplots(2, 2, figsize=(11, 8.5), constrained_layout=True)
+        axes = axes.flatten()
+        
+        for i, (data, val, name) in enumerate(zip(data_sets, input_values, labels)):
+            percentile = stats.percentileofscore(data, val)
+            prices = data
+            price_mean = prices.mean()
+            price_max = prices.max()
+            price_min = prices.min()
+            price_std = prices.std()
+            pct_change = (input_values[i] / pre_daily.close - 1) * 100
+            
+            current_metrics.append({
+                "name": name,
+                "val": val,
+                "pct": pct_change,
+                "pr": percentile
+            })
+            
+            axes[i].hist(data, bins=200, color='skyblue', edgecolor='black', alpha=0.7, cumulative=True, density=True, histtype='step')
+            axes[i].axvline(val, color='red', linestyle='--', label=f'{name}: ${val:.2f}')
+            axes[i].axvspan(price_mean - 1 * price_std, price_mean + 1 * price_std, color="lime", alpha=0.25, label=f'±1σ ({price_mean - 1 * price_std:.2f} - {price_mean + 1 * price_std:.2f})')
+            axes[i].axvspan(price_mean - 2 * price_std, price_mean + 2 * price_std, color="orange", alpha=0.2, label=f'±2σ ({price_mean - 2 * price_std:.2f} - {price_mean + 2 * price_std:.2f})')
+            axes[i].axvspan(price_min, price_max, color="lightcoral", alpha=0.15, label=f'±3σ ({price_min:.2f} - {price_max:.2f})')
+            axes[i].axvline(price_mean, color="black", linestyle="-", linewidth=1, label="Mean")
+
+            # FIXED: Removed the broad x-axis MultipleLocator(10) to let matplotlib auto-scale the price units correctly
+            axes[i].yaxis.set_major_locator(mtick.MultipleLocator(0.10))
+            axes[i].yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+            
+            axes[i].axvline(pre_daily.close, color='grey', linestyle=':', label=f'T-1 close: ${pre_daily.close:.2f}')
+            axes[i].set_title(f"{name} {pct_change:.2f}% (Percentile: {percentile:.1f}%)")
+            axes[i].legend(loc="upper left", fontsize='x-small')
+            axes[i].grid(True, which='both', linestyle='--', linewidth=0.5)
+            
+        return fig, current_metrics, pre_daily.close
 
 
-def connect_db():
-    """Connects to the sqlite database."""
+# --- STREAMLIT DASHBOARD APPLICATION EXECUTION ---
+st.title("📊 Real-Time Percentile Analysis")
+st.caption("Automatically updating live directly from Alpaca data streams.")
 
-    DB_FILENAME = Path(__file__).parent / "inventory.db"
-    db_already_exists = DB_FILENAME.exists()
+st.sidebar.header("Configuration")
+ticker_input = st.sidebar.text_input("Ticker Symbol", value="SOXL").upper()
+refresh_rate = st.sidebar.slider("Refresh Rate (Seconds)", min_value=5, max_value=60, value=10)
 
-    conn = sqlite3.connect(DB_FILENAME)
-    db_was_just_created = not db_already_exists
+# Triggers the page to refresh safely
+st_autorefresh(interval=refresh_rate * 1000, key="data_refresh_heartbeat")
 
-    return conn, db_was_just_created
+# SECURED: Fetch keys using Streamlit environment secrets 
+try:
+    api_key = st.secrets["ALPACA_KEY"]
+    secret_key = st.secrets["ALPACA_SECRET"]
+except KeyError:
+    st.error("Missing credentials. Please check your `.streamlit/secrets.toml` file configuration.")
+    st.stop()
 
+st.write(f"⏱️ **Last update checked at:** `{datetime.now().strftime('%H:%M:%S')}`")
 
-def initialize_data(conn):
-    """Initializes the inventory table with some data."""
-    cursor = conn.cursor()
-
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS inventory (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            item_name TEXT,
-            price REAL,
-            units_sold INTEGER,
-            units_left INTEGER,
-            cost_price REAL,
-            reorder_point INTEGER,
-            description TEXT
-        )
-        """
+try:
+    analysis = Percentile_Analysis(
+        symbol=ticker_input,
+        api_key=api_key,
+        api_secret=secret_key
     )
+    
+    fig, metrics, t_minus_close = analysis.PR()
+    
+    st.info(f"**Previous Session Close (T-1):** ${t_minus_close:.2f}")
+    
+    cols = st.columns(4)
+    for col, item in zip(cols, metrics):
+        with col:
+            st.metric(
+                label=f"{item['name']} Price", 
+                value=f"${item['val']:.2f}", 
+                delta=f"{item['pct']:.2f}%"
+            )
+            st.text(f"Percentile Rank: {item['pr']:.1f}%")
+    
+    st.markdown("---")
+    
+    st.pyplot(fig)
+    plt.close(fig) 
+    
+except Exception as e:
+    st.error(f"Error updating dashboard metrics: {e}")
 
-    cursor.execute(
-        """
-        INSERT INTO inventory
-            (item_name, price, units_sold, units_left, cost_price, reorder_point, description)
-        VALUES
-            -- Beverages
-            ('Bottled Water (500ml)', 1.50, 115, 15, 0.80, 16, 'Hydrating bottled water'),
-            ('Soda (355ml)', 2.00, 93, 8, 1.20, 10, 'Carbonated soft drink'),
-            ('Energy Drink (250ml)', 2.50, 12, 18, 1.50, 8, 'High-caffeine energy drink'),
-            ('Coffee (hot, large)', 2.75, 11, 14, 1.80, 5, 'Freshly brewed hot coffee'),
-            ('Juice (200ml)', 2.25, 11, 9, 1.30, 5, 'Fruit juice blend'),
-
-            -- Snacks
-            ('Potato Chips (small)', 2.00, 34, 16, 1.00, 10, 'Salted and crispy potato chips'),
-            ('Candy Bar', 1.50, 6, 19, 0.80, 15, 'Chocolate and candy bar'),
-            ('Granola Bar', 2.25, 3, 12, 1.30, 8, 'Healthy and nutritious granola bar'),
-            ('Cookies (pack of 6)', 2.50, 8, 8, 1.50, 5, 'Soft and chewy cookies'),
-            ('Fruit Snack Pack', 1.75, 5, 10, 1.00, 8, 'Assortment of dried fruits and nuts'),
-
-            -- Personal Care
-            ('Toothpaste', 3.50, 1, 9, 2.00, 5, 'Minty toothpaste for oral hygiene'),
-            ('Hand Sanitizer (small)', 2.00, 2, 13, 1.20, 8, 'Small sanitizer bottle for on-the-go'),
-            ('Pain Relievers (pack)', 5.00, 1, 5, 3.00, 3, 'Over-the-counter pain relief medication'),
-            ('Bandages (box)', 3.00, 0, 10, 2.00, 5, 'Box of adhesive bandages for minor cuts'),
-            ('Sunscreen (small)', 5.50, 6, 5, 3.50, 3, 'Small bottle of sunscreen for sun protection'),
-
-            -- Household
-            ('Batteries (AA, pack of 4)', 4.00, 1, 5, 2.50, 3, 'Pack of 4 AA batteries'),
-            ('Light Bulbs (LED, 2-pack)', 6.00, 3, 3, 4.00, 2, 'Energy-efficient LED light bulbs'),
-            ('Trash Bags (small, 10-pack)', 3.00, 5, 10, 2.00, 5, 'Small trash bags for everyday use'),
-            ('Paper Towels (single roll)', 2.50, 3, 8, 1.50, 5, 'Single roll of paper towels'),
-            ('Multi-Surface Cleaner', 4.50, 2, 5, 3.00, 3, 'All-purpose cleaning spray'),
-
-            -- Others
-            ('Lottery Tickets', 2.00, 17, 20, 1.50, 10, 'Assorted lottery tickets'),
-            ('Newspaper', 1.50, 22, 20, 1.00, 5, 'Daily newspaper')
-        """
-    )
-    conn.commit()
-
-
-def load_data(conn):
-    """Loads the inventory data from the database."""
-    cursor = conn.cursor()
-
-    try:
-        cursor.execute("SELECT * FROM inventory")
-        data = cursor.fetchall()
-    except:
-        return None
-
-    df = pd.DataFrame(
-        data,
-        columns=[
-            "id",
-            "item_name",
-            "price",
-            "units_sold",
-            "units_left",
-            "cost_price",
-            "reorder_point",
-            "description",
-        ],
-    )
-
-    return df
-
-
-def update_data(conn, df, changes):
-    """Updates the inventory data in the database."""
-    cursor = conn.cursor()
-
-    if changes["edited_rows"]:
-        deltas = st.session_state.inventory_table["edited_rows"]
-        rows = []
-
-        for i, delta in deltas.items():
-            row_dict = df.iloc[i].to_dict()
-            row_dict.update(delta)
-            rows.append(row_dict)
-
-        cursor.executemany(
-            """
-            UPDATE inventory
-            SET
-                item_name = :item_name,
-                price = :price,
-                units_sold = :units_sold,
-                units_left = :units_left,
-                cost_price = :cost_price,
-                reorder_point = :reorder_point,
-                description = :description
-            WHERE id = :id
-            """,
-            rows,
-        )
-
-    if changes["added_rows"]:
-        cursor.executemany(
-            """
-            INSERT INTO inventory
-                (id, item_name, price, units_sold, units_left, cost_price, reorder_point, description)
-            VALUES
-                (:id, :item_name, :price, :units_sold, :units_left, :cost_price, :reorder_point, :description)
-            """,
-            (defaultdict(lambda: None, row) for row in changes["added_rows"]),
-        )
-
-    if changes["deleted_rows"]:
-        cursor.executemany(
-            "DELETE FROM inventory WHERE id = :id",
-            ({"id": int(df.loc[i, "id"])} for i in changes["deleted_rows"]),
-        )
-
-    conn.commit()
-
-
-# -----------------------------------------------------------------------------
-# Draw the actual page, starting with the inventory table.
-
-# Set the title that appears at the top of the page.
-"""
-# :shopping_bags: Inventory tracker
-
-**Welcome to Alice's Corner Store's intentory tracker!**
-This page reads and writes directly from/to our inventory database.
-"""
-
-st.info(
-    """
-    Use the table below to add, remove, and edit items.
-    And don't forget to commit your changes when you're done.
-    """
-)
-
-# Connect to database and create table if needed
-conn, db_was_just_created = connect_db()
-
-# Initialize data.
-if db_was_just_created:
-    initialize_data(conn)
-    st.toast("Database initialized with some sample data.")
-
-# Load data from database
-df = load_data(conn)
-
-# Display data with editable table
-edited_df = st.data_editor(
-    df,
-    disabled=["id"],  # Don't allow editing the 'id' column.
-    num_rows="dynamic",  # Allow appending/deleting rows.
-    column_config={
-        # Show dollar sign before price columns.
-        "price": st.column_config.NumberColumn(format="$%.2f"),
-        "cost_price": st.column_config.NumberColumn(format="$%.2f"),
-    },
-    key="inventory_table",
-)
-
-has_uncommitted_changes = any(len(v) for v in st.session_state.inventory_table.values())
-
-st.button(
-    "Commit changes",
-    type="primary",
-    disabled=not has_uncommitted_changes,
-    # Update data in database
-    on_click=update_data,
-    args=(conn, df, st.session_state.inventory_table),
-)
-
-
-# -----------------------------------------------------------------------------
-# Now some cool charts
-
-# Add some space
-""
-""
-""
-
-st.subheader("Units left", divider="red")
-
-need_to_reorder = df[df["units_left"] < df["reorder_point"]].loc[:, "item_name"]
-
-if len(need_to_reorder) > 0:
-    items = "\n".join(f"* {name}" for name in need_to_reorder)
-
-    st.error(f"We're running dangerously low on the items below:\n {items}")
-
-""
-""
-
-st.altair_chart(
-    # Layer 1: Bar chart.
-    alt.Chart(df)
-    .mark_bar(
-        orient="horizontal",
-    )
-    .encode(
-        x="units_left",
-        y="item_name",
-    )
-    # Layer 2: Chart showing the reorder point.
-    + alt.Chart(df)
-    .mark_point(
-        shape="diamond",
-        filled=True,
-        size=50,
-        color="salmon",
-        opacity=1,
-    )
-    .encode(
-        x="reorder_point",
-        y="item_name",
-    ),
-    use_container_width=True,
-)
-
-st.caption("NOTE: The :diamonds: location shows the reorder point.")
-
-""
-""
-""
-
-# -----------------------------------------------------------------------------
-
-st.subheader("Best sellers", divider="orange")
-
-""
-""
-
-st.altair_chart(
-    alt.Chart(df)
-    .mark_bar(orient="horizontal")
-    .encode(
-        x="units_sold",
-        y=alt.Y("item_name").sort("-x"),
-    ),
-    use_container_width=True,
-)
