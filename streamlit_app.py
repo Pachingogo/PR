@@ -4,6 +4,7 @@ import pandas as pd
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.timeframe import TimeFrame
 from alpaca.data.requests import StockBarsRequest, StockSnapshotRequest
+from alpaca.data.models import DataFeed # Add this import at the top of your script
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
@@ -50,28 +51,29 @@ class Percentile_Analysis:
             return df
 
     def fetch_data(self) -> pd.DataFrame:
-        try:
-            client = StockHistoricalDataClient(self.api_key, self.api_secret)
-            request = StockBarsRequest(
-                symbol_or_symbols=self.symbol,
-                timeframe=TimeFrame.Day,
-                start=self.start_date,
-                end=self.end_date,
-                adjustment="all"
-            )
-            bars = client.get_stock_bars(request)
-            df = (
-                bars.df.droplevel(0)
-                if isinstance(bars.df.index, pd.MultiIndex)
-                else bars.df
-            )
-            df = df.rename(columns={"close": "price"})
-            df["ret"] = df["price"].pct_change().fillna(0)
-            df.index = pd.to_datetime(df.index)
-            return df
-        except Exception as e:
-            st.error(f"Alpaca API error during historical fetch: {e}")
-            raise e
+    try:
+        client = StockHistoricalDataClient(self.api_key, self.api_secret)
+        request = StockBarsRequest(
+            symbol_or_symbols=self.symbol,
+            timeframe=TimeFrame.Day,
+            start=self.start_date,
+            end=self.end_date,
+            adjustment="all",
+            feed=DataFeed.IEX  # 100% FIXED: Tells Alpaca to use the free real-time tier
+        )
+        bars = client.get_stock_bars(request)
+        df = (
+            bars.df.droplevel(0)
+            if isinstance(bars.df.index, pd.MultiIndex)
+            else bars.df
+        )
+        df = df.rename(columns={"close": "price"})
+        df["ret"] = df["price"].pct_change().fillna(0)
+        df.index = pd.to_datetime(df.index)
+        return df
+    except Exception as e:
+        st.error(f"Alpaca API error during historical fetch: {e}")
+        raise e
 
     def snap(self):
         client = StockHistoricalDataClient(self.api_key, self.api_secret)
