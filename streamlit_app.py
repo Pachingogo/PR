@@ -101,7 +101,7 @@ class Percentile_Analysis:
         labels = ["Current", "Open", "High", "Low"]
         
         current_metrics = []
-        fig, axes = plt.subplots(2, 2, figsize=(11, 8.5), constrained_layout=True)
+        fig, axes = plt.subplots(1, 4, figsize=(11, 8.5), constrained_layout=True)
         axes = axes.flatten()
         
         for i, (data, val, name) in enumerate(zip(data_sets, input_values, labels)):
