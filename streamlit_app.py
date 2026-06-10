@@ -5,7 +5,7 @@ from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.timeframe import TimeFrame
 from alpaca.data.requests import StockBarsRequest, StockSnapshotRequest
 from alpaca.data.enums import DataFeed
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 import streamlit as st
