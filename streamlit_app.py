@@ -290,7 +290,7 @@ class Percentile_Analysis:
             "Recovery_Rate",
             
         ]]
-        print(analysis_result)
+        
         return analysis_result.iloc[0]
 
 # --- STREAMLIT DASHBOARD APPLICATION EXECUTION ---
