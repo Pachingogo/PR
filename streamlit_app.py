@@ -313,19 +313,24 @@ try:
     )
     
     if not ohlc_data.empty:
+        ohlc_data_plot = ohlc_data.reset_index(drop=False)
+        ohlc_data_plot.index = range(len(ohlc_data_plot))
+        
+        # Create datetime strings for display
+        date_labels = ohlc_data_plot.iloc[:, 0].dt.strftime(
+            "%m-%d %H:%M" if selected_config["tf"] != TimeFrame.Day else "%Y-%m-%d"
+        )
+        
         fig = go.Figure(data=[go.Candlestick(
-            x=ohlc_data.index,
-            open=ohlc_data['open'],
-            high=ohlc_data['high'],
-            low=ohlc_data['low'],
-            close=ohlc_data['close'],
+            x=date_labels,  # Use formatted datetime strings
+            open=ohlc_data_plot['open'],
+            high=ohlc_data_plot['high'],
+            low=ohlc_data_plot['low'],
+            close=ohlc_data_plot['close'],
             name=ticker_input,
             increasing_line_color='#26a69a', 
             decreasing_line_color='#ef5350'
         )])
-        
-        # Format the x-axis dynamic labels cleanly depending on if it's Intraday vs Macro Daily
-        x_format = "%Y-%m-%d" if selected_config["tf"] == TimeFrame.Day else "%m-%d %H:%M"
         
         fig.update_layout(
             title=f"{ticker_input} Price Action ({ohlc_option} | Local Time UTC-5)",
@@ -334,12 +339,9 @@ try:
             xaxis_rangeslider_visible=False, 
             template="plotly_dark",           
             height=500,
-            margin=dict(l=50, r=50, t=50, b=50)
+            margin=dict(l=50, r=50, t=50, b=50),
+            
         )
-        
-        fig.update_xaxes(tickformat=x_format)
-        
-        st.plotly_chart(fig, use_container_width=True)
     else:
         st.warning("No intraday or historical bar data returned for the selected window.")
     
