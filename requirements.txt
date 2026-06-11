@@ -5,3 +5,4 @@ pandas>=2.0.0
 alpaca-py>=0.20.0
 matplotlib>=3.7.0
 streamlit-autorefresh>=1.0.0
+plotly>=6.1.2
