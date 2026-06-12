@@ -236,7 +236,7 @@ st_autorefresh(interval=refresh_rate * 1000, key="data_refresh_heartbeat")
 
 try:
     api_key = st.secrets["ALPACA_KEY"]
-    secret_key = st.secrets["ALPACA_SECRET"]    
+    secret_key = st.secrets["ALPACA_SECRET"]
 except KeyError:
     st.error("Missing credentials. Please check your `.streamlit/secrets.toml` file configuration.")
     st.stop()
@@ -355,5 +355,6 @@ try:
     
 except Exception as e:
     st.error(f"Error updating dashboard metrics: {e}")
+
 
 
