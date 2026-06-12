@@ -213,11 +213,11 @@ class Percentile_Analysis:
             bars = client.get_stock_bars(request)
             df = bars.df.droplevel(0) if isinstance(bars.df.index, pd.MultiIndex) else bars.df
             
-            if not df.empty:
-                df.index = pd.to_datetime(df.index)
-                if df.index.tz is None:
-                    df.index = df.index.tz_localize()
-                df.index = df.index.tz_convert(TARGET_TZ)
+            # if not df.empty:
+                # df.index = pd.to_datetime(df.index)
+                # if df.index.tz is None:
+                    # df.index = df.index.tz_localize()
+                # df.index = df.index.tz_convert(TARGET_TZ)
                 
             return df
         except Exception as e:
