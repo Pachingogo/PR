@@ -202,7 +202,7 @@ class Percentile_Analysis:
     def fetch_ohlc_data(self, timeframe: TimeFrame, lookback_days: int) -> pd.DataFrame:
         try:
             client = StockHistoricalDataClient(self.api_key, self.api_secret)
-            start_dt = datetime.now() - timedelta(days=lookback_days)
+            start_dt = datetime.now(TARGET_TZ) - timedelta(days=lookback_days)
             
             request = StockBarsRequest(
                 symbol_or_symbols=self.symbol,
