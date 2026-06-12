@@ -311,7 +311,7 @@ try:
         timeframe=selected_config["tf"], 
         lookback_days=selected_config["days"]
     )
-    
+    print(ohlc_data)
     if not ohlc_data.empty:
         ohlc_data_plot = ohlc_data.reset_index(drop=False)
         ohlc_data_plot.index = range(len(ohlc_data_plot))
