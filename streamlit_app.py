@@ -202,7 +202,7 @@ class Percentile_Analysis:
     def fetch_ohlc_data(self, timeframe: TimeFrame, lookback_days: int) -> pd.DataFrame:
         try:
             client = StockHistoricalDataClient(self.api_key, self.api_secret)
-            start_dt = datetime.now(timezone.utc) - timedelta(days=lookback_days)
+            start_dt = datetime.now() - timedelta(days=lookback_days)
             
             request = StockBarsRequest(
                 symbol_or_symbols=self.symbol,
@@ -216,7 +216,7 @@ class Percentile_Analysis:
             if not df.empty:
                 df.index = pd.to_datetime(df.index)
                 if df.index.tz is None:
-                    df.index = df.index.tz_localize(timezone.utc)
+                    df.index = df.index.tz_localize()
                 df.index = df.index.tz_convert(TARGET_TZ)
                 
             return df
@@ -292,13 +292,13 @@ try:
     # Updated dropdown list to handle new timeframe scopes
     ohlc_option = st.selectbox(
         "Select Chart View (Frequency - Time Frame):",
-        options=["1min - 1Day", "1min - 5Day", "15min - 10Day", "1hr - 60Day", "1day - 360Day"],
+        options=["1min - Intraday", "1min - 5Day", "15min - 10Day", "1hr - 60Day", "1day - 360Day"],
         index=0
     )
     
     # Enhanced mapping configurations to accommodate hourly and macro day bars
     config_mapping = {
-        "1min - 1Day":   {"tf": TimeFrame.Minute, "days": 1},
+        "1min - 1Day":   {"tf": TimeFrame.Minute, "days": 0},
         "1min - 5Day":   {"tf": TimeFrame.Minute, "days": 5},
         "15min - 10Day": {"tf": TimeFrame(15, TimeFrame.Minute.unit), "days": 10},
         "1hr - 60Day":   {"tf": TimeFrame.Hour, "days": 60},
