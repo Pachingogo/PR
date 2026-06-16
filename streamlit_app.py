@@ -344,6 +344,7 @@ try:
             template="plotly_dark",           
             height=500,
             margin=dict(l=50, r=50, t=50, b=50),
+            hovermode = "x unified",
             
         )
         # Show every Nth label to avoid crowding (adjust N based on data density)
