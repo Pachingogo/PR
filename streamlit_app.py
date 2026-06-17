@@ -267,6 +267,7 @@ try:
                 value=f"${item['val']:.2f}", 
                 delta=f"{item['pct']:.2f}%"
             )
+            st.text(f"{item['val']-t_minus_close:.2f}")
             st.text(f"Percentile Rank: {item['pr']:.1f}%")
     
     st.markdown("---")
