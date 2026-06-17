@@ -366,7 +366,7 @@ try:
                 overlaying="y",        # Puts volume in the same vertical space as price
                 showgrid=False,        # Hides extra grid lines to avoid clutter
                 # Forces volume bars to sit in the bottom 20% of the chart
-                range=[0, max(ohlc_data_plot['volume']) * 5] if len(ohlc_data_plot['volume']) > 0 else None
+                range=[0, max(ohlc_data_plot['volume']) * 5] if len(ohlc_data_plot['volume']) > 0 else None)
         )
         # Show every Nth label to avoid crowding (adjust N based on data density)
         tick_interval = max(1, len(date_labels) // 20)  # Show ~20 labels
