@@ -326,27 +326,47 @@ try:
             "%m-%d %H:%M" if selected_config["tf"] != TimeFrame.Day else "%Y-%m-%d"
         )
         
-        fig = go.Figure(data=[go.Candlestick(
-            x=date_labels,  # Use formatted datetime strings
-            open=ohlc_data_plot['open'],
-            high=ohlc_data_plot['high'],
-            low=ohlc_data_plot['low'],
-            close=ohlc_data_plot['close'],
-            name=ticker_input,
-            increasing_line_color='#26a69a', 
-            decreasing_line_color='#ef5350'
-        )])
         
+        fig = go.Figure(data=[
+            go.Candlestick(
+                x=date_labels,  # Use formatted datetime strings
+                open=ohlc_data_plot['open'],
+                high=ohlc_data_plot['high'],
+                low=ohlc_data_plot['low'],
+                close=ohlc_data_plot['close'],
+                name=ticker_input,
+                increasing_line_color='#26a69a', 
+                decreasing_line_color='#ef5350'
+                ),
+            go.Bar(
+                x=date_labels,
+                y=ohlc_data_plot['volume'],  # Assumes 'volume' column exists in your data
+                name='Volume',
+                yaxis='y2',                  # Maps volume to the secondary y-axis
+                marker_color='rgba(128, 128, 128, 0.35)'
+                )
+            ]
+        )
+        
+
         fig.update_layout(
             title=f"{ticker_input} Price Action ({ohlc_option} | Local Time UTC-5)",
             xaxis_title="Time / Date (UTC-5)",
-            yaxis_title="Price ($)",
+            yaxis_title="Price ($)", 
+
             xaxis_rangeslider_visible=True, 
             template="plotly_dark",           
             height=500,
             margin=dict(l=50, r=50, t=50, b=50),
             hovermode = "x unified",
             
+            yaxis2=dict(
+                title="Volume",
+                side="right",
+                overlaying="y",        # Puts volume in the same vertical space as price
+                showgrid=False,        # Hides extra grid lines to avoid clutter
+                # Forces volume bars to sit in the bottom 20% of the chart
+                range=[0, max(ohlc_data_plot['volume']) * 5] if len(ohlc_data_plot['volume']) > 0 else None
         )
         # Show every Nth label to avoid crowding (adjust N based on data density)
         tick_interval = max(1, len(date_labels) // 20)  # Show ~20 labels
