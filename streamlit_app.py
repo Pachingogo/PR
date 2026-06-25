@@ -63,6 +63,7 @@ class Percentile_Analysis:
                 start=self.start_date,
                 end=self.end_date,
                 adjustment="all",
+                feed="sip"
                   
             )
             bars = client.get_stock_bars(request)
