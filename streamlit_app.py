@@ -309,8 +309,8 @@ try:
         "15min - 10D": {"tf": TimeFrame(15, TimeFrame.Minute.unit), "days": 10},
         "1hr - 60D":   {"tf": TimeFrame.Hour, "days": 60},
         "1D - 1Y": {"tf": TimeFrame.Day, "days": 365},
-        "1D - 5Y": {{"tf": TimeFrame.Day, "days": 1825}, 
-        "1wk - 10Y": {{"tf": TimeFrame.Week, "days": 3650}
+        "1D - 5Y": {"tf": TimeFrame.Day, "days": 1825}, 
+        "1wk - 10Y": {"tf": TimeFrame.Week, "days": 3650}
         
     }
     
