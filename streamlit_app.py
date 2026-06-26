@@ -298,17 +298,20 @@ try:
     # Updated dropdown list to handle new timeframe scopes
     ohlc_option = st.selectbox(
         "Select Chart View (Frequency - Time Frame):",
-        options=["1min - Intraday", "1min - 5Day", "15min - 10Day", "1hr - 60Day", "1day - 360Day"],
+        options=["1min - Intraday", "1min - 5D", "15min - 10D", "1hr - 60D", "1D - 1Y", "1D - 5Y", "1wk - 10Y" ],
         index=0
     )
     
     # Enhanced mapping configurations to accommodate hourly and macro day bars
     config_mapping = {
         "1min - Intraday":   {"tf": TimeFrame.Minute, "days": 0},        
-        "1min - 5Day":   {"tf": TimeFrame.Minute, "days": 5},
-        "15min - 10Day": {"tf": TimeFrame(15, TimeFrame.Minute.unit), "days": 10},
-        "1hr - 60Day":   {"tf": TimeFrame.Hour, "days": 60},
-        "1day - 360Day": {"tf": TimeFrame.Day, "days": 360}
+        "1min - 5D":   {"tf": TimeFrame.Minute, "days": 5},
+        "15min - 10D": {"tf": TimeFrame(15, TimeFrame.Minute.unit), "days": 10},
+        "1hr - 60D":   {"tf": TimeFrame.Hour, "days": 60},
+        "1D - 1Y": {"tf": TimeFrame.Day, "days": 365},
+        "1D - 5Y": {{"tf": TimeFrame.Day, "days": 1825}, 
+        "1wk - 10Y": {{"tf": TimeFrame.Week, "days": 3650}
+        
     }
     
     selected_config = config_mapping[ohlc_option]
