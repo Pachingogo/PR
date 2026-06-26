@@ -298,7 +298,7 @@ try:
     # Updated dropdown list to handle new timeframe scopes
     ohlc_option = st.selectbox(
         "Select Chart View (Frequency - Time Frame):",
-        options=["1min - Intraday", "1min - 5D", "15min - 10D", "1hr - 60D", "1D - 1Y", "1D - 5Y", "1wk - 10Y" ],
+        options=["1min - Intraday", "1min - 5D", "15min - 10D", "1hr - 60D", "1D - 1Y"],
         index=0
     )
     
@@ -309,8 +309,7 @@ try:
         "15min - 10D": {"tf": TimeFrame(15, TimeFrame.Minute.unit), "days": 10},
         "1hr - 60D":   {"tf": TimeFrame.Hour, "days": 60},
         "1D - 1Y": {"tf": TimeFrame.Day, "days": 365},
-        "1D - 5Y": {"tf": TimeFrame.Day, "days": 1825}, 
-        "1wk - 10Y": {"tf": TimeFrame.Week, "days": 3650}
+        
         
     }
     
